@@ -1,4 +1,6 @@
-export class ChatRoom {
+// فایل: src/durable_object.js
+// این کلاس باید EXACTLY همین نام رو داشته باشه
+export class DurableChatRoom {
   constructor(state, env) {
     this.state = state;
     this.env = env;
@@ -8,16 +10,12 @@ export class ChatRoom {
 
   async fetch(request) {
     const url = new URL(request.url);
-    
-    // فقط ۲ کاربر اجازه دارند
     const ALLOWED_USERS = ['user1', 'user2'];
-    
-    // پیام جدید
-    if (url.pathname === '/send') {
+
+    if (url.pathname === '/send' && request.method === 'POST') {
       try {
         const { sender, message } = await request.json();
         
-        // چک کن کاربر مجاز است
         if (!ALLOWED_USERS.includes(sender)) {
           return new Response('Access denied', { status: 403 });
         }
@@ -30,11 +28,7 @@ export class ChatRoom {
         };
         
         this.messages.push(msg);
-        
-        // فقط ۱۰۰ پیام آخر نگه دار
-        if (this.messages.length > 100) {
-          this.messages = this.messages.slice(-100);
-        }
+        if (this.messages.length > 100) this.messages = this.messages.slice(-100);
         
         return new Response(JSON.stringify({ success: true, message: msg }), {
           headers: { 
@@ -43,15 +37,11 @@ export class ChatRoom {
           }
         });
       } catch (error) {
-        return new Response(JSON.stringify({ error: error.message }), {
-          status: 400,
-          headers: { 'Content-Type': 'application/json' }
-        });
+        return new Response(JSON.stringify({ error: error.message }), { status: 400 });
       }
     }
     
-    // دریافت پیام‌ها
-    if (url.pathname === '/messages') {
+    if (url.pathname === '/messages' && request.method === 'GET') {
       return new Response(JSON.stringify(this.messages), {
         headers: { 
           'Content-Type': 'application/json',
@@ -60,7 +50,6 @@ export class ChatRoom {
       });
     }
     
-    // کاربر آنلاین
     if (url.pathname === '/online') {
       if (request.method === 'POST') {
         const { user } = await request.json();
@@ -69,12 +58,10 @@ export class ChatRoom {
         }
       }
       
-      // کاربران آفلاین قدیمی را پاک کن
+      // پاک کردن کاربران آفلاین
       const now = Date.now();
       for (const [key, time] of this.users.entries()) {
-        if (now - time > 30000) { // 30 ثانیه
-          this.users.delete(key);
-        }
+        if (now - time > 30000) this.users.delete(key);
       }
       
       return new Response(JSON.stringify({
@@ -87,15 +74,6 @@ export class ChatRoom {
       });
     }
     
-    // پاک کردن چت
-    if (url.pathname === '/clear') {
-      this.messages = [];
-      this.users.clear();
-      return new Response('Chat cleared');
-    }
-    
-    return new Response('Chat API - Endpoints: /send, /messages, /online', {
-      headers: { 'Content-Type': 'text/plain' }
-    });
+    return new Response('Chat API - Use /send, /messages, /online');
   }
 }
